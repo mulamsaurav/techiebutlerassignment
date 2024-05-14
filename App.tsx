@@ -1,118 +1,140 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
   View,
+  Text,
+  FlatList,
+  SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {fetchDataFromUrl} from './api/fetchData.ts';
+import PostDetails from './PostDetails.tsx';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const {width, height} = Dimensions.get('screen');
+const App = () => {
+  const [postData, setPostData] = useState<Posts[]>([]);
+  const [selectedPostId, setSelectedPostId] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  useEffect(() => {
+    (async () => {
+      fetchDataFromUrl(
+        `https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`,
+      )
+        .then((data: Posts[]) => {
+          setPostData(data);
+        })
+        .catch(error => {
+          console.error('Failed to fetch data:', error.message);
+        });
+    })();
+  }, [page]);
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  // Heavy computation function using useMemo
+  const computeDetails = useMemo(() => {
+    return (item: any) => {
+      const startTime = Date.now();
+      const computedDetails = {
+        characterCount: item?.title.length,
+      };
+      const endTime = Date.now();
+      const timeTaken = endTime - startTime;
+      console.log('Time taken for heavy computation:', timeTaken + 'ms');
+      return computedDetails;
+    };
+  }, []);
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const handlePostClick = useCallback((postId: number) => {
+    setSelectedPostId(postId);
+  }, []);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const renderPostItems = ({item}: {item: Posts}) => {
+    const details = computeDetails(item);
+    return (
+      <TouchableOpacity
+        style={{margin: 5}}
+        onPress={() => handlePostClick(item.id)}>
+        <Text style={{color: 'black', fontSize: 14}}>Id :{item?.id}</Text>
+        <Text>Title : {item?.title}</Text>
+        <Text>Characters : {details.characterCount}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFooter = () => {
+    const disable = postData.length === 0;
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: 10,
+          marginBottom: height * 0.3,
+          width: width * 0.6,
+          alignSelf: 'center',
+        }}>
+        <Text
+          disabled={page === 1}
+          style={{
+            borderWidth: 1,
+            padding: 10,
+            borderRadius: 10,
+            color: 'black',
+          }}
+          onPress={() => setPage(prev => prev - 1)}>
+          Back
+        </Text>
+        <Text>{page}</Text>
+        <Text
+          style={{
+            borderWidth: 1,
+            padding: 10,
+            borderRadius: 10,
+            color: 'black',
+          }}
+          disabled={disable}
+          onPress={() => setPage(prev => prev + 1)}>
+          Next
+        </Text>
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <SafeAreaView style={{marginHorizontal: 10}}>
+      {selectedPostId > 0 && postData.length > 0 && (
+        <PostDetails postId={selectedPostId} />
+      )}
+      <FlatList
+        data={postData}
+        renderItem={renderPostItems}
+        showsVerticalScrollIndicator={false}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={() => (
+          <Text
+            style={{
+              color: 'black',
+              textAlign: 'center',
+              marginTop: height * 0.3,
+            }}>
+            No data found.
+          </Text>
+        )}
+        ItemSeparatorComponent={() => (
+          <View
+            style={{
+              height: 1,
+              backgroundColor: 'grey',
+              width: '90%',
+              alignSelf: 'center',
+              marginVertical: 5,
+            }}
+          />
+        )}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
     </SafeAreaView>
   );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
 export default App;
